@@ -14,3 +14,4 @@ class Category(Base):
     icon_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     topics = relationship("Topic", back_populates="category")
+    roadmap_items = relationship("RoadmapItem", back_populates="category", order_by="RoadmapItem.order_index")

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 import {
   Menu,
   X,
@@ -12,13 +14,12 @@ import {
   BookOpen,
   MessageSquare,
   Building2,
+  Shield,
 } from "lucide-react";
 
-interface NavbarProps {
-  user?: { username: string; role: string } | null;
-}
-
-export default function Navbar({ user }: NavbarProps) {
+export default function Navbar() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -28,6 +29,12 @@ export default function Navbar({ user }: NavbarProps) {
     { href: "/companies", label: "Companies", icon: Building2 },
     { href: "/discuss", label: "Discuss", icon: MessageSquare },
   ];
+
+  const handleLogout = () => {
+    logout();
+    setProfileOpen(false);
+    router.push("/");
+  };
 
   return (
     <nav className="sticky top-0 z-50 border-b border-gray-800 bg-gray-950/80 backdrop-blur-xl">
@@ -72,12 +79,26 @@ export default function Navbar({ user }: NavbarProps) {
                   <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-700 bg-gray-900 py-1 shadow-xl">
                     <Link
                       href={`/profile/${user.username}`}
+                      onClick={() => setProfileOpen(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
                     >
                       <User className="h-4 w-4" />
                       Profile
                     </Link>
-                    <button className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-gray-800">
+                    {user.role === "admin" && (
+                      <Link
+                        href="/admin/dashboard"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
+                      >
+                        <Shield className="h-4 w-4" />
+                        Admin Panel
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-gray-800"
+                    >
                       <LogOut className="h-4 w-4" />
                       Logout
                     </button>
@@ -123,20 +144,40 @@ export default function Navbar({ user }: NavbarProps) {
                 {link.label}
               </Link>
             ))}
-            <div className="mt-3 flex flex-col gap-2 border-t border-gray-800 pt-3">
-              <Link
-                href="/auth/login"
-                className="rounded-lg px-3 py-2.5 text-center text-sm text-gray-300 hover:bg-gray-800"
-              >
-                Log In
-              </Link>
-              <Link
-                href="/auth/register"
-                className="rounded-lg bg-green-600 px-3 py-2.5 text-center text-sm font-medium text-white"
-              >
-                Sign Up
-              </Link>
-            </div>
+            {user ? (
+              <div className="mt-3 flex flex-col gap-1 border-t border-gray-800 pt-3">
+                <Link
+                  href={`/profile/${user.username}`}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <User className="h-4 w-4" />
+                  Profile
+                </Link>
+                <button
+                  onClick={() => { handleLogout(); setMobileOpen(false); }}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-red-400 hover:bg-gray-800"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2 border-t border-gray-800 pt-3">
+                <Link
+                  href="/auth/login"
+                  className="rounded-lg px-3 py-2.5 text-center text-sm text-gray-300 hover:bg-gray-800"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/auth/register"
+                  className="rounded-lg bg-green-600 px-3 py-2.5 text-center text-sm font-medium text-white"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>

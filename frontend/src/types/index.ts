@@ -87,3 +87,26 @@ export interface DiscussionComment {
   downvotes: number;
   created_at: string;
 }
+
+export interface RoadmapItem {
+  id: number;
+  category_id: number;
+  title: string;
+  description: string | null;
+  order_index: number;
+  week_number: number;
+  estimated_hours: number;
+}
+
+export interface LearningResource {
+  id: number;
+  category_id: number;
+  topic_id: number | null;
+  roadmap_item_id: number | null;
+  title: string;
+  url: string;
+  resource_type: "video" | "article" | "playlist";
+  difficulty_level: string | null;
+  estimated_duration_minutes: number | null;
+  order_in_playlist: number;
+}

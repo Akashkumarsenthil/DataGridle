@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.question import Question, QuestionStatus
 from app.models.submission import Submission, SubmissionResult
 from app.schemas.question import (
@@ -60,8 +60,15 @@ async def create_question(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in ("creator", "admin"):
-        raise HTTPException(status_code=403, detail="Only creators and admins can create questions")
+    # Only verified creators and admins can create questions.
+    if not (
+        (current_user.role == UserRole.CREATOR and current_user.is_verified)
+        or current_user.role == UserRole.ADMIN
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only approved creators and admins can create questions",
+        )
 
     question = Question(
         **data.model_dump(exclude={"company_ids"}),

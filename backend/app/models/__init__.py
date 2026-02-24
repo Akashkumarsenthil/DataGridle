@@ -5,6 +5,7 @@ from app.models.question import Question, QuestionCompanyMap
 from app.models.company import CompanyTag
 from app.models.submission import Submission
 from app.models.discussion import Discussion, DiscussionComment
+from app.models.roadmap import RoadmapItem
 from app.models.learning import LearningResource
 from app.models.progress import UserProgress
 from app.models.badge import Badge, UserBadge
@@ -22,6 +23,7 @@ __all__ = [
     "Submission",
     "Discussion",
     "DiscussionComment",
+    "RoadmapItem",
     "LearningResource",
     "UserProgress",
     "Badge",

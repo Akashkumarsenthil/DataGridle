@@ -11,7 +11,7 @@ from app.core.security import (
     create_refresh_token,
     get_current_user,
 )
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, TokenResponse, UserResponse, TokenRefresh
 from app.core.config import get_settings
 
@@ -32,10 +32,21 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
             detail="User with this email or username already exists",
         )
 
+    # Only normal users and creators can self-register.
+    requested_role = (user_data.role or "user").lower()
+    if requested_role not in ("user", "creator"):
+        requested_role = "user"
+
+    # Regular users are immediately verified; creators must be approved by an admin.
+    role_enum = UserRole.CREATOR if requested_role == "creator" else UserRole.USER
+    is_verified = requested_role == "user"
+
     user = User(
         username=user_data.username,
         email=user_data.email,
         password_hash=hash_password(user_data.password),
+        role=role_enum,
+        is_verified=is_verified,
         experience_level=user_data.experience_level,
         target_role=user_data.target_role,
     )
@@ -54,6 +65,15 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
+        )
+
+    # Only fully approved accounts are allowed to log in.
+    # Regular users are auto-approved on registration (is_verified=True).
+    # Creators must be approved by an admin first.
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is pending admin approval. Please try again later.",
         )
 
     return TokenResponse(

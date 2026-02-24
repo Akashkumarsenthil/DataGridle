@@ -7,14 +7,17 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [form, setForm] = useState({
     username: "",
     email: "",
     password: "",
     confirmPassword: "",
+    role: "user",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,8 +37,9 @@ export default function RegisterPage() {
         username: form.username,
         email: form.email,
         password: form.password,
+        role: form.role,
       });
-      await api.login(form.email, form.password);
+      await login(form.email, form.password);
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -97,6 +101,44 @@ export default function RegisterPage() {
             onChange={update("confirmPassword")}
             required
           />
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-300">Account type</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, role: "user" }))}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                  form.role === "user"
+                    ? "border-green-500 bg-green-500/10 text-green-300"
+                    : "border-gray-700 bg-gray-900 text-gray-300"
+                }`}
+              >
+                <div className="font-medium">Learner</div>
+                <div className="mt-0.5 text-xs text-gray-400">
+                  Solve questions, track progress.
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, role: "creator" }))}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                  form.role === "creator"
+                    ? "border-blue-400 bg-blue-500/10 text-blue-200"
+                    : "border-gray-700 bg-gray-900 text-gray-300"
+                }`}
+              >
+                <div className="font-medium">Creator</div>
+                <div className="mt-0.5 text-xs text-gray-400">
+                  Request to submit questions (admin approval required).
+                </div>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Learner accounts get full access immediately. Creator accounts can log in
+              but need admin approval before publishing content.
+            </p>
+          </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account..." : "Sign Up"}

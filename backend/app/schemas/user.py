@@ -9,6 +9,9 @@ class UserCreate(BaseModel):
     password: str
     experience_level: str | None = None
     target_role: str | None = None
+    # requested platform role; only 'user' gets immediate full access.
+    # 'creator' accounts require admin approval via is_verified flag.
+    role: str = "user"
 
 
 class UserLogin(BaseModel):
