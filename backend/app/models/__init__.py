@@ -12,6 +12,8 @@ from app.models.badge import Badge, UserBadge
 from app.models.dataset import Dataset
 from app.models.daily_question import DailyQuestion
 from app.models.report import Report
+from app.models.assessment import AssessmentQuestion, UserAssessmentAnswer, UserTopicStrength
+from app.models.domain_preference import UserDomainPreference
 
 __all__ = [
     "User",
@@ -31,4 +33,8 @@ __all__ = [
     "Dataset",
     "DailyQuestion",
     "Report",
+    "AssessmentQuestion",
+    "UserAssessmentAnswer",
+    "UserTopicStrength",
+    "UserDomainPreference",
 ]

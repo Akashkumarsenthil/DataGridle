@@ -15,3 +15,4 @@ class Category(Base):
 
     topics = relationship("Topic", back_populates="category")
     roadmap_items = relationship("RoadmapItem", back_populates="category", order_by="RoadmapItem.order_index")
+    domain_preferences = relationship("UserDomainPreference", back_populates="category")

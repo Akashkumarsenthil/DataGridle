@@ -8,6 +8,43 @@ export interface User {
   target_role: string | null;
   avatar_url: string | null;
   streak_count: number;
+  assessment_completed_at: string | null;
+  created_at: string;
+}
+
+export interface AssessmentQuestion {
+  id: number;
+  topic_id: number;
+  category_id: number;
+  question_text: string;
+  question_type: "mcq" | "scale";
+  options: Record<string, string> | null;
+  scale_max: number | null;
+  order_index: number;
+}
+
+export interface TopicStrength {
+  topic_id: number;
+  topic_name: string;
+  category_id: number;
+  category_slug: string;
+  category_name: string;
+  score: number;
+  strength_label: "beginner" | "intermediate" | "advanced";
+}
+
+export interface UserProfileWithStrengths {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  is_verified: boolean;
+  experience_level: string | null;
+  target_role: string | null;
+  avatar_url: string | null;
+  streak_count: number;
+  assessment_completed_at: string | null;
+  topic_strengths: TopicStrength[];
   created_at: string;
 }
 
@@ -109,4 +146,30 @@ export interface LearningResource {
   difficulty_level: string | null;
   estimated_duration_minutes: number | null;
   order_in_playlist: number;
+  topic_name?: string | null;
+}
+
+export interface DomainPreference {
+  duration_weeks: number;
+}
+
+export interface RoadmapWeekExpand {
+  roadmap_item: { id: number; title: string; description: string | null; week_number: number };
+  granular_tasks: string[];
+  resources: {
+    type: "youtube" | "article" | "book";
+    title: string;
+    url?: string;
+    description?: string;
+    source?: string;
+    author?: string;
+    reason?: string;
+  }[];
+}
+
+export interface ResourcesByWeek {
+  week_number: number;
+  roadmap_title: string;
+  roadmap_item_id: number | null;
+  resources: (LearningResource & { topic_name?: string | null })[];
 }

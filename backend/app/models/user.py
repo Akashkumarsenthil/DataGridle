@@ -39,6 +39,9 @@ class User(Base):
     target_companies: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     streak_count: Mapped[int] = mapped_column(Integer, default=0)
+    assessment_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -52,3 +55,6 @@ class User(Base):
     discussions = relationship("Discussion", back_populates="author")
     progress = relationship("UserProgress", back_populates="user")
     badges = relationship("UserBadge", back_populates="user")
+    assessment_answers = relationship("UserAssessmentAnswer", back_populates="user")
+    topic_strengths = relationship("UserTopicStrength", back_populates="user")
+    domain_preferences = relationship("UserDomainPreference", back_populates="user")

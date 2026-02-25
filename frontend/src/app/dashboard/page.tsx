@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { getDomainIcon, getDomainColors } from "@/components/domain/DomainCard";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import type { Category } from "@/types";
 import {
   Flame,
@@ -16,7 +18,16 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    if (user && user.assessment_completed_at == null) {
+      router.replace("/onboarding/assessment");
+      return;
+    }
+  }, [user, router]);
 
   useEffect(() => {
     api

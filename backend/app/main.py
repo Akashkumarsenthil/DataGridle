@@ -14,9 +14,17 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     from app.core.database import async_session
     from app.services.seed import seed_database
+    from sqlalchemy import text
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add new columns to existing tables (idempotent for existing DBs)
+        try:
+            await conn.execute(text("""
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS assessment_completed_at TIMESTAMP WITH TIME ZONE
+            """))
+        except Exception:
+            pass
 
     async with async_session() as session:
         await seed_database(session)

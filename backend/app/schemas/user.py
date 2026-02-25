@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     target_role: str | None
     avatar_url: str | None
     streak_count: int
+    assessment_completed_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -50,3 +51,11 @@ class TokenResponse(BaseModel):
 
 class TokenRefresh(BaseModel):
     refresh_token: str
+
+
+class DomainPreferenceResponse(BaseModel):
+    duration_weeks: int
+
+
+class DomainPreferenceUpdate(BaseModel):
+    duration_weeks: int

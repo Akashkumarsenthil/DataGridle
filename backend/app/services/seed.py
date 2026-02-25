@@ -10,6 +10,7 @@ from app.models.user import User, UserRole
 from app.models.roadmap import RoadmapItem
 from app.models.learning import LearningResource
 from app.models.question import Question
+from app.models.assessment import AssessmentQuestion
 from app.core.security import hash_password
 
 
@@ -489,6 +490,33 @@ SAMPLE_QUESTIONS = {
     ],
 }
 
+# ──────────────────────────────────────────────
+# Assessment questions (onboarding skill check)
+# (category_slug, topic_name, question_text, question_type, options, scale_max, order_index)
+# ──────────────────────────────────────────────
+
+ASSESSMENT_QUESTIONS = [
+    # SQL
+    ("data-engineering", "SQL Basics", "How would you rate your ability to write SELECT queries with WHERE, ORDER BY, and GROUP BY?", "scale", None, 5, 1),
+    ("data-engineering", "SQL Joins", "How comfortable are you with INNER, LEFT, and FULL JOINs?", "scale", None, 5, 2),
+    ("data-engineering", "Window Functions", "Have you used window functions (ROW_NUMBER, RANK, LAG/LEAD) in production or interviews?", "mcq", {"a": "Never", "b": "Heard of them only", "c": "Used a few times", "d": "Comfortable", "e": "Expert"}, None, 3),
+    # Python / Data Science
+    ("data-science", "Python for Data Science", "How would you rate your Python programming for data tasks (loops, list comprehensions, functions)?", "scale", None, 5, 4),
+    ("data-science", "Pandas & NumPy", "How often do you use Pandas/NumPy for data manipulation?", "mcq", {"a": "Never", "b": "Rarely", "c": "Sometimes", "d": "Often", "e": "Daily"}, None, 5),
+    ("data-science", "Descriptive Statistics", "How confident are you explaining mean, median, variance, and standard deviation?", "scale", None, 5, 6),
+    # Stats & ML
+    ("data-science", "Hypothesis Testing", "Have you run A/B tests or hypothesis tests (t-test, chi-squared) in practice?", "mcq", {"a": "No", "b": "Once or twice", "c": "Several times", "d": "Regularly", "e": "Expert"}, None, 7),
+    ("machine-learning", "Supervised Learning Basics", "How would you rate your understanding of supervised vs unsupervised learning?", "scale", None, 5, 8),
+    ("machine-learning", "Linear & Logistic Regression", "Can you implement or explain linear and logistic regression from scratch?", "mcq", {"a": "No", "b": "Basic idea only", "c": "Yes with help", "d": "Yes confidently", "e": "Expert"}, None, 9),
+    # Data Engineering concepts
+    ("data-engineering", "Data Modeling", "How familiar are you with star/snowflake schemas and dimensional modeling?", "scale", None, 5, 10),
+    ("data-analytics", "SQL for Analytics", "How would you rate your SQL for analytics (funnels, cohorts, KPIs)?", "scale", None, 5, 11),
+    # General
+    ("data-science", "Exploratory Data Analysis", "How often do you perform EDA and visualization before modeling?", "mcq", {"a": "Never", "b": "Rarely", "c": "Sometimes", "d": "Usually", "e": "Always"}, None, 12),
+    ("generative-ai", "LLM Fundamentals", "How would you rate your knowledge of LLMs and prompt engineering?", "scale", None, 5, 13),
+    ("devops-dataops", "Docker Containers", "Have you built or run applications using Docker?", "mcq", {"a": "No", "b": "Tried once", "c": "Yes for local dev", "d": "Yes in production", "e": "Expert"}, None, 14),
+]
+
 COMPANIES = [
     {"company_name": "Google", "industry": "Technology"},
     {"company_name": "Amazon", "industry": "E-commerce / Cloud"},
@@ -512,7 +540,46 @@ COMPANIES = [
 
 async def seed_database(db: AsyncSession):
     existing = await db.execute(select(Category).limit(1))
-    if existing.scalar_one_or_none():
+    has_categories = existing.scalar_one_or_none() is not None
+
+    # Build or reuse category and topic lookups for assessment questions
+    cat_map: dict[str, Category] = {}
+    topic_lookup: dict[tuple[str, str], Topic] = {}
+
+    if has_categories:
+        cats = await db.execute(select(Category))
+        for c in cats.scalars().all():
+            cat_map[c.slug] = c
+        cat_by_id = {c.id: c for c in cat_map.values()}
+        topics_result = await db.execute(select(Topic))
+        for t in topics_result.scalars().all():
+            cat = cat_by_id.get(t.category_id)
+            if cat:
+                topic_lookup[(cat.slug, t.name)] = t
+
+    aq_exists = await db.execute(select(AssessmentQuestion).limit(1))
+    if aq_exists.scalar_one_or_none():
+        pass  # already seeded
+    elif topic_lookup and cat_map:
+        for cat_slug, topic_name, qtext, qtype, options, scale_max, order_index in ASSESSMENT_QUESTIONS:
+            key = (cat_slug, topic_name)
+            if key not in topic_lookup:
+                continue
+            topic = topic_lookup[key]
+            aq = AssessmentQuestion(
+                topic_id=topic.id,
+                category_id=topic.category_id,
+                question_text=qtext,
+                question_type=qtype,
+                options=options,
+                scale_max=scale_max,
+                order_index=order_index,
+            )
+            db.add(aq)
+        await db.commit()
+        return
+
+    if has_categories:
         return
 
     # 1. Categories
@@ -525,12 +592,14 @@ async def seed_database(db: AsyncSession):
 
     # 2. Topics
     topic_first_map: dict[str, Topic] = {}
+    topic_lookup: dict[tuple[str, str], Topic] = {}
     for slug, topic_list in TOPICS.items():
         cat = cat_map[slug]
         first_topic = None
         for topic_data in topic_list:
             topic = Topic(category_id=cat.id, **topic_data)
             db.add(topic)
+            topic_lookup[(slug, topic_data["name"])] = topic
             if first_topic is None:
                 first_topic = topic
         if first_topic:
@@ -596,5 +665,22 @@ async def seed_database(db: AsyncSession):
                 status="approved",
             )
             db.add(q)
+
+    # 8. Assessment questions (onboarding)
+    for cat_slug, topic_name, qtext, qtype, options, scale_max, order_index in ASSESSMENT_QUESTIONS:
+        key = (cat_slug, topic_name)
+        if key not in topic_lookup:
+            continue
+        topic = topic_lookup[key]
+        aq = AssessmentQuestion(
+            topic_id=topic.id,
+            category_id=topic.category_id,
+            question_text=qtext,
+            question_type=qtype,
+            options=options,
+            scale_max=scale_max,
+            order_index=order_index,
+        )
+        db.add(aq)
 
     await db.commit()

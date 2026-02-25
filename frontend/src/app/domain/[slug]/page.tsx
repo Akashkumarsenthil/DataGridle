@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import type { Category, RoadmapItem, LearningResource, Question } from "@/types";
+import { useAuth } from "@/lib/auth-context";
+import type { Category, RoadmapItem, LearningResource, Question, DomainPreference, ResourcesByWeek } from "@/types";
 import RoadmapTimeline from "@/components/domain/RoadmapTimeline";
 import VideoCard from "@/components/domain/VideoCard";
+import TimeCommitmentModal from "@/components/domain/TimeCommitmentModal";
 import { getDomainIcon, getDomainColors } from "@/components/domain/DomainCard";
 import Card from "@/components/ui/Card";
-import { ArrowLeft, Map, PlayCircle, FileQuestion } from "lucide-react";
+import { ArrowLeft, Map, PlayCircle, FileQuestion, Sparkles } from "lucide-react";
 
 type TabKey = "roadmap" | "learn" | "practice";
 
@@ -36,6 +38,18 @@ export default function DomainHubPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("roadmap");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<{
+    personalized: boolean;
+    data?: {
+      summary?: string;
+      next_steps?: { title: string; reason: string; priority: number }[];
+      topics_to_study_first?: string[];
+      topics_to_skip_or_review_lightly?: string[];
+    };
+  } | null>(null);
+  const [domainPreference, setDomainPreference] = useState<DomainPreference | null | undefined>(undefined);
+  const [resourcesByWeek, setResourcesByWeek] = useState<ResourcesByWeek[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!slug) return;
@@ -63,6 +77,34 @@ export default function DomainHubPage() {
     load();
   }, [slug]);
 
+  useEffect(() => {
+    if (!slug || !user?.assessment_completed_at) return;
+    api
+      .get<{ personalized: boolean; data: Record<string, unknown> }>(`/users/me/suggestions?domain=${slug}`)
+      .then(setSuggestions)
+      .catch(() => setSuggestions(null));
+  }, [slug, user?.assessment_completed_at]);
+
+  useEffect(() => {
+    if (!slug) return;
+    api.get<ResourcesByWeek[]>(`/categories/${slug}/resources/grouped`).then(setResourcesByWeek).catch(() => setResourcesByWeek([]));
+  }, [slug]);
+
+  useEffect(() => {
+    if (!slug || !user) return;
+    api
+      .get<DomainPreference | null>(`/users/me/domains/${slug}/preference`)
+      .then((v) => setDomainPreference(v ?? null))
+      .catch(() => setDomainPreference(undefined));
+  }, [slug, user]);
+
+  const savePreference = async (durationWeeks: number) => {
+    await api.put<DomainPreference>(`/users/me/domains/${slug}/preference`, { duration_weeks: durationWeeks });
+    setDomainPreference({ duration_weeks: durationWeeks });
+  };
+
+  const showTimeModal = user && domainPreference === null && !loading;
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -88,6 +130,13 @@ export default function DomainHubPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {showTimeModal && (
+        <TimeCommitmentModal
+          domainName={category.name}
+          onSave={savePreference}
+          onSkip={() => savePreference(10)}
+        />
+      )}
       {/* Back link */}
       <Link
         href="/"
@@ -114,6 +163,34 @@ export default function DomainHubPage() {
         </div>
       </div>
 
+      {/* Personalized suggestions (when logged in and assessment done) */}
+      {suggestions?.data && (
+        <Card className="mb-8 border-green-500/20 bg-gradient-to-r from-green-900/10 to-gray-900">
+          <div className="flex items-center gap-2 text-green-400 mb-2">
+            <Sparkles className="h-5 w-5" />
+            <span className="font-medium">
+              {suggestions.personalized ? "Recommended for you" : "Complete your assessment for personalized tips"}
+            </span>
+          </div>
+          {suggestions.personalized && (
+            <p className="text-xs text-gray-500 mb-1">Based on your assessment.</p>
+          )}
+          {suggestions.data.summary && (
+            <p className="text-sm text-gray-300 mb-3">{suggestions.data.summary}</p>
+          )}
+          {suggestions.data.next_steps && suggestions.data.next_steps.length > 0 && (
+            <ul className="list-disc list-inside space-y-1 text-sm text-gray-400">
+              {suggestions.data.next_steps.slice(0, 4).map((s, i) => (
+                <li key={i}>
+                  <span className="text-white">{s.title}</span>
+                  {s.reason && <span className="text-gray-500"> — {s.reason}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
       {/* Tabs */}
       <div className="mb-8 flex gap-1 rounded-xl bg-gray-900/80 p-1 border border-gray-800">
         {TABS.map((tab) => (
@@ -133,19 +210,77 @@ export default function DomainHubPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === "roadmap" && <RoadmapTimeline items={roadmap} />}
+      {activeTab === "roadmap" && (
+        <RoadmapTimeline
+          slug={slug}
+          items={roadmap}
+          topicsToStudyFirst={suggestions?.data?.topics_to_study_first}
+          topicsToSkipOrReview={suggestions?.data?.topics_to_skip_or_review_lightly}
+          isAuthenticated={!!user}
+        />
+      )}
 
       {activeTab === "learn" && (
         <div>
-          {resources.length === 0 ? (
+          {resourcesByWeek.length === 0 ? (
             <div className="py-16 text-center text-gray-500">
               No video resources available yet.
             </div>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {resources.map((r) => (
-                <VideoCard key={r.id} resource={r} />
-              ))}
+            <div className="space-y-10">
+              {resourcesByWeek
+                .filter((g) => g.week_number > 0)
+                .map((group) => {
+                  const byTopic = group.resources.reduce(
+                    (acc, r) => {
+                      const topic = r.topic_name || "General";
+                      if (!acc[topic]) acc[topic] = [];
+                      acc[topic].push(r);
+                      return acc;
+                    },
+                    {} as Record<string, typeof group.resources>
+                  );
+                  const topics = Object.keys(byTopic);
+                  return (
+                    <div key={group.roadmap_item_id ?? `week-${group.week_number}`}>
+                      <h3 className="mb-4 text-lg font-semibold text-white">
+                        Week {group.week_number}: {group.roadmap_title}
+                      </h3>
+                      {topics.length > 1 ? (
+                        <div className="space-y-6">
+                          {topics.map((topic) => (
+                            <div key={topic}>
+                              <h4 className="mb-2 text-sm font-medium text-gray-400">{topic}</h4>
+                              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                                {byTopic[topic].map((r) => (
+                                  <VideoCard key={r.id} resource={r} />
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                          {group.resources.map((r) => (
+                            <VideoCard key={r.id} resource={r} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              {resourcesByWeek.some((g) => g.week_number === 0) && (
+                <div>
+                  <h3 className="mb-4 text-lg font-semibold text-white">Other</h3>
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {resourcesByWeek
+                      .find((g) => g.week_number === 0)
+                      ?.resources.map((r) => (
+                        <VideoCard key={r.id} resource={r} />
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

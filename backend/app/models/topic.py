@@ -27,3 +27,5 @@ class Topic(Base):
 
     category = relationship("Category", back_populates="topics")
     questions = relationship("Question", back_populates="topic")
+    assessment_questions = relationship("AssessmentQuestion", back_populates="topic")
+    user_strengths = relationship("UserTopicStrength", back_populates="topic")
